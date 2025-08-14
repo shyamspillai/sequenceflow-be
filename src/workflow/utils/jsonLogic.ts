@@ -1,4 +1,5 @@
-import jsonLogic, { type RulesLogic } from 'json-logic-js'
+import * as jsonLogic from 'json-logic-js'
+import { type RulesLogic } from 'json-logic-js'
 
 export type ValidationResult = { isValid: boolean; message: string | null }
 
