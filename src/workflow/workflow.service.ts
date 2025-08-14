@@ -6,6 +6,8 @@ import { WorkflowNode } from './entities/node.entity'
 import { WorkflowEdge } from './entities/edge.entity'
 import { CreateWorkflowInputDto, PersistedWorkflowDto } from './dto/workflow.dto'
 import { executeWorkflow, ExecutionResult } from './utils/runner'
+import { WorkflowRun } from './entities/run.entity'
+import { WorkflowRunLog } from './entities/runLog.entity'
 
 @Injectable()
 export class WorkflowService {
@@ -13,7 +15,16 @@ export class WorkflowService {
 		@InjectRepository(Workflow) private readonly workflowRepo: Repository<Workflow>,
 		@InjectRepository(WorkflowNode) private readonly nodeRepo: Repository<WorkflowNode>,
 		@InjectRepository(WorkflowEdge) private readonly edgeRepo: Repository<WorkflowEdge>,
+		@InjectRepository(WorkflowRun) private readonly runRepo: Repository<WorkflowRun>,
+		@InjectRepository(WorkflowRunLog) private readonly logRepo: Repository<WorkflowRunLog>,
 	) {}
+
+	private parseIfString<T>(val: unknown, fallback: T): T {
+		if (typeof val === 'string') {
+			try { return JSON.parse(val) as T } catch { return fallback }
+		}
+		return (val as T) ?? fallback
+	}
 
 	async list(): Promise<Array<{ id: string; name: string; updatedAt: number }>> {
 		const items = await this.workflowRepo.find({ order: { updatedAt: 'DESC' } })
@@ -95,11 +106,69 @@ export class WorkflowService {
 		await this.workflowRepo.delete(id)
 	}
 
-	async execute(id: string, initialInput?: Record<string, unknown>): Promise<ExecutionResult> {
+	async execute(id: string, initialInput?: Record<string, unknown>): Promise<{ runId: string; logs: ExecutionResult['logs'] }> {
 		const wf = await this.workflowRepo.findOne({ where: { id } })
 		if (!wf) throw new NotFoundException('Workflow not found')
 		const dto = this.toPersistedDto(wf)
-		return executeWorkflow(dto, initialInput)
+
+		let run = new WorkflowRun()
+		run.workflow = wf
+		run.status = 'running'
+		run.input = initialInput ?? null
+		run = await this.runRepo.save(run)
+
+		// system start log
+		const startLog = new WorkflowRunLog()
+		startLog.run = run
+		startLog.type = 'system'
+		startLog.message = 'Run started'
+		await this.logRepo.save(startLog)
+
+		const result = executeWorkflow(dto, initialInput)
+
+		const logEntities: WorkflowRunLog[] = result.logs.map(l => {
+			const e = new WorkflowRunLog()
+			e.run = run
+			e.nodePersistedId = l.nodeId
+			e.type = 'node-output'
+			e.message = l.content
+			e.data = { name: l.name, kind: l.kind }
+			return e
+		})
+		if (logEntities.length) await this.logRepo.save(logEntities)
+
+		const endLog = new WorkflowRunLog()
+		endLog.run = run
+		endLog.type = 'system'
+		endLog.message = 'Run finished'
+		await this.logRepo.save(endLog)
+
+		run.status = 'succeeded'
+		run.result = { logCount: logEntities.length }
+		run.finishedAt = new Date()
+		await this.runRepo.save(run)
+
+		return { runId: run.id, logs: result.logs }
+	}
+
+	async listRuns(workflowId: string): Promise<Array<{ id: string; status: string; startedAt: number; finishedAt?: number }>> {
+		const wf = await this.workflowRepo.findOne({ where: { id: workflowId } })
+		if (!wf) throw new NotFoundException('Workflow not found')
+		const runs = await this.runRepo.find({ where: { workflow: { id: workflowId } as any }, order: { startedAt: 'DESC' as any, updatedAt: 'DESC' as any } })
+		return runs.map(r => ({ id: r.id, status: r.status, startedAt: r.startedAt.getTime(), finishedAt: r.finishedAt ? r.finishedAt.getTime() : undefined }))
+	}
+
+	async getRun(workflowId: string, runId: string): Promise<{ id: string; status: string; startedAt: number; finishedAt?: number; logs: Array<{ id: string; type: string; nodePersistedId?: string; message: string; data?: Record<string, unknown>; timestamp: number }> } | null> {
+		const run = await this.runRepo.findOne({ where: { id: runId, workflow: { id: workflowId } as any } })
+		if (!run) return null
+		const logs = await this.logRepo.find({ where: { run: { id: run.id } as any }, order: { timestamp: 'ASC' as any } })
+		return {
+			id: run.id,
+			status: run.status,
+			startedAt: run.startedAt.getTime(),
+			finishedAt: run.finishedAt ? run.finishedAt.getTime() : undefined,
+			logs: logs.map(l => ({ id: l.id, type: l.type, nodePersistedId: l.nodePersistedId || undefined, message: l.message, data: l.data ?? undefined, timestamp: l.timestamp.getTime() })),
+		}
 	}
 
 	private toPersistedDto(wf: Workflow): PersistedWorkflowDto {
@@ -112,11 +181,11 @@ export class WorkflowService {
 					id: n.baseId,
 					type: n.type,
 					name: n.name,
-					inputSchema: n.inputSchema,
-					outputSchema: n.outputSchema,
-					config: n.config,
+					inputSchema: this.parseIfString(n.inputSchema, {} as any),
+					outputSchema: this.parseIfString(n.outputSchema, {} as any),
+					config: this.parseIfString(n.config, {} as any),
 					validationLogic: n.validationLogic ?? undefined,
-					connections: n.connections,
+					connections: this.parseIfString(n.connections, [] as any),
 				},
 				position: { x: n.x, y: n.y },
 			})),

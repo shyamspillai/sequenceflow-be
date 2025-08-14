@@ -39,4 +39,22 @@ export class WorkflowController {
 	async execute(@Param('id') id: string, @Body() body?: { input?: Record<string, unknown> }) {
 		return this.service.execute(id, body?.input)
 	}
+
+	@Post(':id/trigger')
+	async trigger(@Param('id') id: string, @Body() body?: { input?: Record<string, unknown> }) {
+		// Placeholder for async scheduler; for now, execute synchronously and return result
+		return this.service.execute(id, body?.input)
+	}
+
+	@Get(':id/runs')
+	async listRuns(@Param('id') id: string) {
+		return this.service.listRuns(id)
+	}
+
+	@Get(':id/runs/:runId')
+	async getRun(@Param('id') id: string, @Param('runId') runId: string) {
+		const run = await this.service.getRun(id, runId)
+		if (!run) throw new NotFoundException('Run not found')
+		return run
+	}
 } 
