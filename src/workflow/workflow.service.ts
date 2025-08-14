@@ -124,7 +124,7 @@ export class WorkflowService {
 		startLog.message = 'Run started'
 		await this.logRepo.save(startLog)
 
-		const result = executeWorkflow(dto, initialInput)
+		const result = await executeWorkflow(dto, initialInput)
 
 		const logEntities: WorkflowRunLog[] = result.logs.map(l => {
 			const e = new WorkflowRunLog()
