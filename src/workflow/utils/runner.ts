@@ -106,12 +106,12 @@ async function executeApiCall(base: any, payload: Record<string, unknown>): Prom
 
 		const logKind = success ? 'api' : 'api-error'
 		const logContent = success 
-			? `${method} ${url} → ${response.status} ${response.statusText}`
-			: `${method} ${url} → ${response.status} ${response.statusText} (unexpected status)`
+			? `${method} ${url} → ${response.status} ${response.statusText}\nResponse: ${JSON.stringify(responseData, null, 2)}`
+			: `${method} ${url} → ${response.status} ${response.statusText} (unexpected status)\nResponse: ${JSON.stringify(responseData, null, 2)}`
 
 		return {
 			logs: [{ kind: logKind, nodeId: base.id, name: base.name, content: logContent }],
-			payload: result
+			payload: result // Pass the wrapped result object so templates use {{data.companies[0].name}}
 		}
 
 	} catch (error: any) {
@@ -128,8 +128,8 @@ async function executeApiCall(base: any, payload: Record<string, unknown>): Prom
 		}
 
 		return {
-			logs: [{ kind: 'api-error', nodeId: base.id, name: base.name, content: `API Call failed: ${errorMessage}` }],
-			payload: result
+			logs: [{ kind: 'api-error', nodeId: base.id, name: base.name, content: `API Call failed: ${errorMessage}\nURL: ${urlTemplate}\nError Details: ${JSON.stringify(error, null, 2)}` }],
+			payload: result // Keep the error result structure for error cases
 		}
 	}
 }
@@ -210,7 +210,17 @@ const executors: Record<string, NodeExecutor> = {
 	},
 	notification: async (base, payload) => {
 		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
-		const content = interpolateTemplate((cfg ?? {}).template ?? '', payload as any)
+		const template = (cfg ?? {}).template ?? ''
+		
+		// Debug logging
+		console.log(`Notification Node Debug:`)
+		console.log(`Template: "${template}"`)
+		console.log(`Payload:`, JSON.stringify(payload, null, 2))
+		
+		const content = interpolateTemplate(template, payload as any)
+		
+		console.log(`Rendered Content: "${content}"`)
+		
 		return { 
 			logs: [{ kind: 'notification', nodeId: base.id, name: base.name, content }],
 			payload // Pass payload through to downstream nodes
