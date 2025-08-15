@@ -3,7 +3,7 @@ import { applyJsonLogic } from './jsonLogic'
 import { interpolateTemplate, getByPath } from './template'
 
 export type ExecutionResult = {
-	logs: Array<{ kind: 'notification' | 'input' | 'decision' | 'api' | 'api-error'; nodeId: string; name: string; content: string }>
+	logs: Array<{ kind: 'notification' | 'input' | 'decision' | 'api' | 'api-error' | 'delay'; nodeId: string; name: string; content: string }>
 }
 
 function findStartNode(wf: PersistedWorkflowDto) {
@@ -22,6 +22,7 @@ export type NodeExecuteResult = {
 	logs: ExecutionResult['logs']
 	allowedSourceHandles?: Set<string>
 	payload?: Record<string, unknown>
+	delayMs?: number // For delay nodes
 }
 
 export type NodeExecutor = (base: any, payload: Record<string, unknown>) => Promise<NodeExecuteResult>
@@ -159,6 +160,54 @@ const executors: Record<string, NodeExecutor> = {
 		const allowedSourceHandles = new Set<string>([...matchedIds.map(id => `out-${id}`)])
 		return { logs, allowedSourceHandles, payload } // Pass payload through
 	},
+	delay: async (base, payload) => {
+		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
+		const delayMs = cfg?.delayMs || 5000 // Default 5 seconds
+		const delayType = cfg?.delayType || 'seconds'
+		const delayValue = cfg?.delayValue || 5
+		
+		// Convert delay to milliseconds based on type
+		let actualDelayMs = delayMs
+		if (cfg?.delayType && cfg?.delayValue) {
+			switch (delayType) {
+				case 'seconds':
+					actualDelayMs = delayValue * 1000
+					break
+				case 'minutes':
+					actualDelayMs = delayValue * 60 * 1000
+					break
+				case 'hours':
+					actualDelayMs = delayValue * 60 * 60 * 1000
+					break
+				case 'days':
+					actualDelayMs = delayValue * 24 * 60 * 60 * 1000
+					break
+				default:
+					actualDelayMs = delayValue * 1000
+			}
+		}
+		
+		// Format delay for human readability
+		const formatDelay = (ms: number): string => {
+			const seconds = Math.floor(ms / 1000)
+			const minutes = Math.floor(seconds / 60)
+			const hours = Math.floor(minutes / 60)
+			const days = Math.floor(hours / 24)
+			
+			if (days > 0) return `${days} day(s)`
+			if (hours > 0) return `${hours} hour(s)`
+			if (minutes > 0) return `${minutes} minute(s)`
+			return `${seconds} second(s)`
+		}
+		
+		const delayText = formatDelay(actualDelayMs)
+		
+		return { 
+			logs: [{ kind: 'delay', nodeId: base.id, name: base.name, content: `Delay scheduled: ${delayText}` }],
+			payload, // Pass payload through to downstream nodes
+			delayMs: actualDelayMs // This will be used by the task execution service
+		}
+	},
 	notification: async (base, payload) => {
 		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
 		const content = interpolateTemplate((cfg ?? {}).template ?? '', payload as any)
@@ -198,7 +247,7 @@ export async function executeWorkflow(wf: PersistedWorkflowDto, initialInput?: R
 		if (!node) continue
 		const exec = executors[(node as any).type] as NodeExecutor | undefined
 		if (!exec) continue
-		const { logs: nodeLogs, allowedSourceHandles, payload: nodeOutput } = await exec(node as any, payload)
+		const { logs: nodeLogs, allowedSourceHandles, payload: nodeOutput, delayMs } = await exec(node as any, payload)
 		logs.push(...(nodeLogs ?? []))
 		
 		// Update payload for next nodes if this node produced output

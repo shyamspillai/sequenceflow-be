@@ -32,7 +32,7 @@ export class DependencyService {
 			return
 		}
 
-		// Get the completed task to check allowed source handles
+		// Get the completed task to check allowed source handles and any delay
 		const completedTask = await this.taskRepo.findOne({
 			where: { run: { id: runId }, nodeId: completedNodeId }
 		})
@@ -41,6 +41,9 @@ export class DependencyService {
 			this.logger.warn(`Completed task not found or not in completed state for node ${completedNodeId}`)
 			return
 		}
+
+		// Extract delay from completed task output if it's a delay node
+		const delayMs = (completedTask.output as any)?.delayMs || 0
 
 		// Find all edges where this node is the source
 		const outgoingEdges = await this.edgeRepo.find({
@@ -63,7 +66,7 @@ export class DependencyService {
 
 		// Check each target node's dependencies
 		for (const edge of validEdges) {
-			await this.checkNodeDependencies(runId, edge.targetId, completedTask.output || {})
+			await this.checkNodeDependencies(runId, edge.targetId, completedTask.output || {}, delayMs)
 		}
 
 		// Check if the entire workflow run is complete
@@ -73,7 +76,7 @@ export class DependencyService {
 	/**
 	 * Check if a specific node's dependencies are satisfied and queue it if ready
 	 */
-	private async checkNodeDependencies(runId: string, nodeId: string, payload: Record<string, unknown>): Promise<void> {
+	private async checkNodeDependencies(runId: string, nodeId: string, payload: Record<string, unknown>, delayMs?: number): Promise<void> {
 		// Get the task for this node
 		const task = await this.taskRepo.findOne({
 			where: { run: { id: runId }, nodeId },
@@ -94,14 +97,31 @@ export class DependencyService {
 		const allDependenciesCompleted = await this.areDependenciesSatisfied(runId, task.dependencies)
 
 		if (allDependenciesCompleted) {
-			this.logger.log(`All dependencies satisfied for task ${task.id} (node ${nodeId}), queuing for execution`)
+			if (delayMs && delayMs > 0) {
+				this.logger.log(`Dependencies satisfied for task ${task.id} (node ${nodeId}), queuing with ${delayMs}ms delay`)
+			} else {
+				this.logger.log(`All dependencies satisfied for task ${task.id} (node ${nodeId}), queuing for execution`)
+			}
 			
 			// Update task status and input
 			task.status = 'queued'
 			task.input = payload
 			const savedTask = await this.taskRepo.save(task)
 
-			// Add to execution queue
+			// Add to execution queue with optional delay
+			const jobOptions: any = {
+				attempts: 3,
+				backoff: {
+					type: 'exponential',
+					delay: 2000,
+				},
+			}
+
+			// Add delay if specified (for delay nodes)
+			if (delayMs && delayMs > 0) {
+				jobOptions.delay = delayMs
+			}
+
 			const job = await this.queues.addTaskJob({
 				taskId: savedTask.id,
 				runId: runId,
@@ -109,7 +129,7 @@ export class DependencyService {
 				nodeType: task.nodeType,
 				input: payload,
 				workflowId: savedTask.run.workflow.id, // Now this will work
-			})
+			}, jobOptions)
 
 			// Update task with job ID
 			savedTask.jobId = job.id

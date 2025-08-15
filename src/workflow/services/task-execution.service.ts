@@ -102,7 +102,14 @@ export class TaskExecutionService {
 
 			// Mark task as completed
 			task.status = 'completed'
-			task.output = result.payload || null
+			
+			// For delay nodes, include delay information in the output
+			const output = result.payload || {}
+			if (result.delayMs) {
+				(output as any).delayMs = result.delayMs
+			}
+			
+			task.output = output
 			task.allowedSourceHandles = result.allowedSourceHandles ? Array.from(result.allowedSourceHandles) : null
 			task.completedAt = new Date()
 			await this.taskRepo.save(task)

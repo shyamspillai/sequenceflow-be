@@ -1,5 +1,6 @@
-import { Queue } from 'bullmq'
 import { Injectable } from '@nestjs/common'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue, Job } from 'bullmq'
 
 export interface TaskJobData {
 	taskId: string
@@ -57,10 +58,13 @@ export class WorkflowQueues {
 		})
 	}
 
-	async addTaskJob(data: TaskJobData, options?: { delay?: number; priority?: number }) {
-		return this.taskQueue.add('execute-task', data, {
-			priority: options?.priority || 0,
-			delay: options?.delay || 0,
+	async addTaskJob(data: TaskJobData, options?: any): Promise<Job<TaskJobData>> {
+		return this.taskQueue.add('execute-task', data, options || {
+			attempts: 3,
+			backoff: {
+				type: 'exponential',
+				delay: 2000,
+			},
 		})
 	}
 
