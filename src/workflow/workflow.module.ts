@@ -17,6 +17,7 @@ import { AsyncWorkflowService } from './services/async-workflow.service'
 import { TaskExecutionService } from './services/task-execution.service'
 import { DependencyService } from './services/dependency.service'
 import { ApiTemplateService } from './services/api-template.service'
+import { WorkflowSeedService } from './services/workflow-seed.service'
 import { TaskProcessor } from './processors/task.processor'
 import { DependencyProcessor } from './processors/dependency.processor'
 
@@ -54,6 +55,7 @@ import { DependencyProcessor } from './processors/dependency.processor'
 		TaskExecutionService,
 		DependencyService,
 		ApiTemplateService,
+		WorkflowSeedService,
 		WorkflowQueues,
 		TaskProcessor,
 		DependencyProcessor,

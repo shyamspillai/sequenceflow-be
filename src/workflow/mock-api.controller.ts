@@ -253,4 +253,260 @@ export class MockApiController {
 			timestamp: new Date().toISOString()
 		}
 	}
+
+	// Lead Scoring API
+	@Post('lead-scoring/analyze')
+	async analyzeLeadScore(@Body() body: any) {
+		const { lead_source, company, title, email } = body
+		
+		// Random score with some logic
+		let baseScore = Math.floor(Math.random() * 40) + 50 // 50-90
+		
+		// Boost score for LinkedIn leads
+		if (lead_source === 'LinkedIn') {
+			baseScore += Math.floor(Math.random() * 20) + 5 // +5 to +25
+		}
+		
+		// Boost for CEO titles
+		if (title && title.toLowerCase().includes('ceo')) {
+			baseScore += Math.floor(Math.random() * 15) + 10 // +10 to +25
+		}
+		
+		const finalScore = Math.min(baseScore, 100)
+		
+		return {
+			lead_id: `lead_${Date.now()}`,
+			lead_source,
+			company,
+			title,
+			email,
+			score: finalScore,
+			qualification: finalScore > 75 ? 'High' : finalScore > 50 ? 'Medium' : 'Low',
+			factors: {
+				lead_source_score: lead_source === 'LinkedIn' ? 25 : 15,
+				title_score: title && title.toLowerCase().includes('ceo') ? 20 : 10,
+				engagement_score: Math.floor(Math.random() * 30) + 20
+			},
+			timestamp: new Date().toISOString()
+		}
+	}
+
+	// AE Notification API
+	@Post('notifications/ae-alert')
+	async sendAENotification(@Body() body: any) {
+		const { lead_id, lead_source, score, company, title } = body
+		
+		return {
+			notification_id: `notif_${Date.now()}`,
+			type: 'ae_alert',
+			status: 'sent',
+			message: `🚨 High-value lead detected! ${company} (${title}) from ${lead_source} - Score: ${score}`,
+			ae_name: 'Sarah Johnson',
+			ae_email: 'sarah.johnson@company.com',
+			sent_at: new Date().toISOString(),
+			channels: ['email', 'slack', 'mobile']
+		}
+	}
+
+	// Email Campaign API
+	@Post('email/follow-up')
+	async sendFollowUpEmail(@Body() body: any) {
+		const { lead_id, email, first_name, company } = body
+		
+		const templates = [
+			'personalized_intro',
+			'value_proposition',
+			'case_study_relevant',
+			'demo_invitation'
+		]
+		
+		return {
+			email_id: `email_${Date.now()}`,
+			type: 'follow_up',
+			template: templates[Math.floor(Math.random() * templates.length)],
+			recipient: email,
+			subject: `Following up on your interest - ${company}`,
+			status: 'sent',
+			delivery_time: new Date().toISOString(),
+			tracking: {
+				delivered: true,
+				opened: Math.random() > 0.3, // 70% open rate
+				clicked: Math.random() > 0.7  // 30% click rate
+			}
+		}
+	}
+
+	// Gifting Sequence API
+	@Post('campaigns/gifting-sequence')
+	async triggerGiftingSequence(@Body() body: any) {
+		const { lead_id, title, company } = body
+		
+		const gifts = [
+			{ type: 'premium_swag', value: '$50', description: 'Premium branded merchandise package' },
+			{ type: 'gift_card', value: '$100', description: 'Amazon gift card' },
+			{ type: 'experience', value: '$200', description: 'Executive lunch invitation' },
+			{ type: 'book', value: '$30', description: 'Leadership book with personal note' }
+		]
+		
+		const selectedGift = gifts[Math.floor(Math.random() * gifts.length)]
+		
+		return {
+			sequence_id: `gift_seq_${Date.now()}`,
+			lead_id,
+			gift: selectedGift,
+			status: 'initiated',
+			estimated_delivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days
+			personalization: `Congratulations on your role as ${title} at ${company}!`,
+			tracking_number: `GIFT${Math.floor(Math.random() * 1000000)}`,
+			approval_required: selectedGift.value.includes('200'),
+			initiated_at: new Date().toISOString()
+		}
+	}
+
+	// Drip Campaign API
+	@Post('campaigns/drip-campaign')
+	async triggerDripCampaign(@Body() body: any) {
+		const { lead_id, email, company, title } = body
+		
+		const campaigns = [
+			{ name: 'enterprise_nurture', duration_days: 30, emails: 8 },
+			{ name: 'smb_conversion', duration_days: 14, emails: 5 },
+			{ name: 'industry_specific', duration_days: 21, emails: 6 },
+			{ name: 'product_education', duration_days: 28, emails: 7 }
+		]
+		
+		const selectedCampaign = campaigns[Math.floor(Math.random() * campaigns.length)]
+		
+		return {
+			campaign_id: `drip_${Date.now()}`,
+			campaign_name: selectedCampaign.name,
+			lead_id,
+			recipient: email,
+			status: 'active',
+			sequence_position: 1,
+			total_emails: selectedCampaign.emails,
+			next_email_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+			completion_date: new Date(Date.now() + selectedCampaign.duration_days * 24 * 60 * 60 * 1000).toISOString(),
+			personalization: {
+				company,
+				title,
+				industry: 'Technology'
+			},
+			started_at: new Date().toISOString()
+		}
+	}
+
+	// Smart Building Temperature Sensor API
+	@Get('building/temperature')
+	async getBuildingTemperature(@Query() query: any) {
+		const { zone = 'main', floor = '1' } = query
+		
+		// Random temperature with some logic for different zones
+		let baseTemp = 22 + (Math.random() * 16) // 22-38°C range
+		
+		// Make some zones hotter
+		if (zone === 'server_room') {
+			baseTemp += Math.random() * 8 // Servers generate heat
+		} else if (zone === 'rooftop') {
+			baseTemp += Math.random() * 6 // Sun exposure
+		}
+		
+		const temperature = Math.round(baseTemp * 10) / 10 // Round to 1 decimal
+		
+		return {
+			sensor_id: `temp_sensor_${zone}_${floor}`,
+			zone,
+			floor,
+			temperature,
+			unit: 'celsius',
+			humidity: Math.floor(Math.random() * 40) + 40,
+			air_quality: temperature > 30 ? 'poor' : temperature > 25 ? 'moderate' : 'good',
+			last_reading: new Date().toISOString(),
+			sensor_status: 'active',
+			calibration_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days ago
+		}
+	}
+
+	// AC Control API
+	@Post('building/ac/control')
+	async controlACUnit(@Body() body: any) {
+		const { zone = 'main', action, target_temperature } = body
+		
+		const success = Math.random() > 0.1 // 90% success rate
+		
+		return {
+			control_id: `ac_control_${Date.now()}`,
+			zone,
+			action,
+			target_temperature,
+			status: success ? 'success' : 'failed',
+			current_mode: action === 'turn_on' ? 'cooling' : action === 'turn_off' ? 'off' : 'auto',
+			power_consumption: action === 'turn_on' ? Math.floor(Math.random() * 2000) + 1500 : 0, // Watts
+			estimated_time_to_target: action === 'turn_on' ? Math.floor(Math.random() * 15) + 5 : null, // 5-20 minutes
+			error_message: success ? null : 'Communication timeout with AC unit',
+			timestamp: new Date().toISOString()
+		}
+	}
+
+	// Building Manager Notification API
+	@Post('building/notifications/manager')
+	async notifyBuildingManager(@Body() body: any) {
+		const { zone, temperature, issue_type = 'temperature_alert' } = body
+		
+		return {
+			notification_id: `bldg_notif_${Date.now()}`,
+			type: issue_type,
+			priority: temperature > 35 ? 'critical' : temperature > 30 ? 'high' : 'medium',
+			message: `🌡️ Temperature alert in ${zone}: ${temperature}°C exceeds threshold`,
+			manager_name: 'Mike Chen',
+			manager_email: 'mike.chen@building.com',
+			manager_phone: '+1-555-BLDG-MGR',
+			sent_via: ['email', 'sms', 'building_app'],
+			acknowledgment_required: true,
+			acknowledgment_deadline: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+			escalation_contact: 'emergency@building.com',
+			sent_at: new Date().toISOString()
+		}
+	}
+
+	// Manager Acknowledgment Check API
+	@Get('building/notifications/:notificationId/status')
+	async checkManagerAcknowledgment(@Param('notificationId') notificationId: string) {
+		// Random acknowledgment - 60% chance manager responds within time
+		const acknowledged = Math.random() > 0.4
+		const responseTime = Math.floor(Math.random() * 12) + 2 // 2-14 minutes
+		
+		return {
+			notification_id: notificationId,
+			acknowledged,
+			acknowledgment_time: acknowledged ? new Date(Date.now() - responseTime * 60 * 1000).toISOString() : null,
+			response_message: acknowledged ? 'Issue confirmed. On-site team dispatched.' : null,
+			response_time_minutes: acknowledged ? responseTime : null,
+			escalation_triggered: !acknowledged,
+			status: acknowledged ? 'resolved' : 'pending_escalation'
+		}
+	}
+
+	// Backup Cooling System API
+	@Post('building/backup-cooling/activate')
+	async activateBackupCooling(@Body() body: any) {
+		const { zone, emergency_mode = false } = body
+		
+		const success = Math.random() > 0.05 // 95% success rate
+		
+		return {
+			activation_id: `backup_cooling_${Date.now()}`,
+			zone,
+			status: success ? 'activated' : 'failed',
+			system_type: 'emergency_hvac',
+			capacity: '150% of normal cooling',
+			estimated_cooldown_time: Math.floor(Math.random() * 10) + 10, // 10-20 minutes
+			power_consumption: Math.floor(Math.random() * 3000) + 3000, // 3000-6000 Watts
+			activation_reason: emergency_mode ? 'Manager non-response escalation' : 'Manual activation',
+			auto_shutoff_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+			monitoring_frequency: '30 seconds',
+			error_message: success ? null : 'Backup system maintenance required',
+			activated_at: new Date().toISOString()
+		}
+	}
 } 
