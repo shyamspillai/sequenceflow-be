@@ -8,27 +8,6 @@ This backend supports both synchronous and asynchronous workflow execution using
 ```bash
 # Start everything (API + Workers + Infrastructure + Monitoring)
 npm run docker:dev
-
-# Or manually:
-./scripts/dev-setup.sh
-```
-
-### Production
-```bash
-# Start with 2 workers (default)
-npm run docker:prod
-
-# Or with custom worker count:
-./scripts/prod-setup.sh 5 10  # 5 workers, 10 concurrency each
-```
-
-### Scaling Workers
-```bash
-# Scale to 10 workers
-npm run docker:scale 10
-
-# Or manually:
-./scripts/scale-workers.sh 10
 ```
 
 ## 🏗️ Architecture Overview
@@ -73,7 +52,7 @@ Create Tasks for All Nodes
      ↓
 Build Dependency Graph
      ↓
-Queue Start Node (inputText)
+Queue Start Node (inputText / httpCall)
      ↓
 Worker Executes Task
      ↓
@@ -103,76 +82,38 @@ services:
 - **Volume Mounting**: Your code is mounted for live editing
 
 ### Production Environment
-- **Optimized Images**: Multi-stage build for smaller images
 - **Health Checks**: Automatic service monitoring
 - **Scaling Ready**: Easy horizontal worker scaling
-- **Security**: Non-root user, minimal attack surface
 
-## 📡 API Endpoints
+## 🔧 API Endpoints
 
-### Async Execution (New)
-
-#### Start Async Workflow
+### Workflow Management
 ```http
-POST /workflows/{id}/execute-async
-Content-Type: application/json
-
-{
-  "input": {
-    "key": "value"
-  }
-}
+GET    /workflows                           # List all workflows
+POST   /workflows                           # Create new workflow
+GET    /workflows/:id                       # Get workflow details
+PUT    /workflows/:id                       # Update workflow
+DELETE /workflows/:id                       # Delete workflow
+POST   /workflows/:id/execute-async         # Execute workflow asynchronously
 ```
 
-Response:
-```json
-{
-  "runId": "uuid-here"
-}
-```
-
-#### Check Run Status
+### Workflow Execution
 ```http
-GET /workflows/runs/{runId}/status
+GET    /workflows/:id/runs                  # List workflow runs
+GET    /workflows/:id/runs/:runId/status    # Get execution status and logs
+POST   /workflows/:id/runs/:runId/cancel    # Cancel running workflow
 ```
 
-Response:
-```json
-{
-  "status": "running",
-  "startedAt": "2024-01-01T00:00:00Z",
-  "finishedAt": null,
-  "tasks": [
-    {
-      "id": "task-uuid",
-      "nodeId": "node-1",
-      "nodeType": "inputText",
-      "status": "completed",
-      "startedAt": "2024-01-01T00:00:00Z",
-      "completedAt": "2024-01-01T00:00:01Z"
-    }
-  ],
-  "logs": [
-    {
-      "id": "log-uuid",
-      "type": "node-output",
-      "message": "Task completed",
-      "timestamp": "2024-01-01T00:00:01Z",
-      "nodeId": "node-1"
-    }
-  ]
-}
-```
-
-#### Cancel Running Workflow
+### Mock API Endpoints (for testing)
 ```http
-POST /workflows/runs/{runId}/cancel
-```
-
-### Legacy Sync Execution (Preserved)
-
-```http
-POST /workflows/{id}/execute
+GET    /workflows/api/mock/apollo/person-enrichment    # Person data enrichment
+GET    /workflows/api/mock/workflows/api/test-weather  # Weather data API
+POST   /workflows/api/mock/lead-scoring/analyze        # Lead scoring service
+POST   /workflows/api/mock/notifications/ae-alert      # Sales notification
+POST   /workflows/api/mock/email/follow-up             # Email automation
+GET    /workflows/api/mock/sensors/temperature/live    # Temperature sensors
+POST   /workflows/api/mock/building/ac/control         # AC system control
+POST   /workflows/api/mock/triggers/temperature-alert  # Automated triggers
 ```
 
 ## 🛠️ Development Commands
@@ -207,27 +148,6 @@ WORKER_CONCURRENCY: 3
 CHOKIDAR_USEPOLLING: true  # For hot reload
 ```
 
-Production (set in docker-compose.yml):
-```yaml
-NODE_ENV: production
-PGHOST: postgres
-REDIS_HOST: redis
-WORKER_CONCURRENCY: 5
-```
-
-### Scaling Configuration
-
-#### Vertical Scaling (Per Worker)
-```bash
-# Set worker concurrency
-WORKER_CONCURRENCY=10 ./scripts/prod-setup.sh
-```
-
-#### Horizontal Scaling (More Workers)
-```bash
-# Scale to 20 workers
-./scripts/scale-workers.sh 20
-```
 
 ## 🌐 Service URLs
 
@@ -238,60 +158,6 @@ WORKER_CONCURRENCY=10 ./scripts/prod-setup.sh
 - **Redis Commander**: http://localhost:8081
 - **BullMQ Dashboard**: http://localhost:3001
 
-### Production
-- **API**: http://localhost:3000
-- **Redis**: localhost:6380 (mapped from container port 6379)
-- **PostgreSQL**: localhost:5432
-- **Monitoring Tools**: Use `--profile tools` flag
-
-## 🚀 Production Deployment
-
-### Local Production Test
-```bash
-./scripts/prod-setup.sh 5 10  # 5 workers, 10 concurrency each
-```
-
-### Cloud Deployment
-
-#### Docker Swarm
-```bash
-# Initialize swarm
-docker swarm init
-
-# Deploy stack
-docker stack deploy -c docker-compose.yml workflow-engine
-```
-
-#### Kubernetes
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: workflow-worker
-spec:
-  replicas: 10  # Scale based on load
-  selector:
-    matchLabels:
-      app: workflow-worker
-  template:
-    spec:
-      containers:
-      - name: worker
-        image: your-registry/workflow-engine:latest
-        command: ["node", "dist/worker.js"]
-        env:
-        - name: WORKER_CONCURRENCY
-          value: "5"
-        - name: REDIS_HOST
-          value: "redis-service"
-        resources:
-          requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-```
 
 ## 📈 Monitoring & Observability
 
@@ -352,14 +218,6 @@ npm run docker:down:dev
 npm run docker:dev
 ```
 
-#### Worker scaling issues
-```bash
-# Check current workers
-npm run docker:ps
-
-# Force restart workers
-docker-compose restart worker
-```
 
 #### Database connection issues
 ```bash
@@ -370,25 +228,3 @@ docker-compose exec postgres pg_isready -U postgres
 docker-compose down -v  # WARNING: Deletes data
 npm run docker:dev
 ```
-
-### Performance Tuning
-
-#### High Load Scenarios
-```bash
-# Scale workers aggressively
-./scripts/scale-workers.sh 20
-
-# Increase worker concurrency
-WORKER_CONCURRENCY=15 ./scripts/prod-setup.sh 10
-```
-
-#### Memory Optimization
-```bash
-# Monitor resource usage
-docker stats
-
-# Limit worker memory
-# Edit docker-compose.yml to add memory limits
-```
-
-This Docker-based architecture provides a production-ready, scalable workflow engine that can handle massive concurrent loads while being easy to develop, deploy, and maintain! 
