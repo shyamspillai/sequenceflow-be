@@ -125,4 +125,39 @@ export class CreateWorkflowInputDto {
 	@ValidateNested()
 	@Type(() => CreateWorkflowPayloadDto)
 	workflow!: CreateWorkflowPayloadDto
+}
+
+export class UpdateWorkflowInputDto {
+	@IsOptional()
+	@IsString()
+	id?: string
+
+	@IsString()
+	@IsNotEmpty()
+	name!: string
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => PersistedNodeDto)
+	nodes?: PersistedNodeDto[]
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => PersistedEdgeDto)
+	edges?: PersistedEdgeDto[]
+
+	@IsOptional()
+	@IsInt()
+	createdAt?: number
+
+	@IsOptional()
+	@IsInt()
+	updatedAt?: number
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => CreateWorkflowPayloadDto)
+	workflow?: CreateWorkflowPayloadDto
 } 

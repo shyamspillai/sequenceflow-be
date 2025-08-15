@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Infrastructure Services
+  # Infrastructure Services (same as production)
   postgres:
     image: postgres:15-alpine
     environment:
@@ -30,12 +30,14 @@ services:
       timeout: 3s
       retries: 5
 
-  # Application Services
-  api:
-    build: .
-    container_name: workflow-api
+  # Development API Server with hot reload
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: workflow-api-dev
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3000
       - PGHOST=postgres
       - PGPORT=5432  # Internal container port, not external mapped port
@@ -44,27 +46,26 @@ services:
       - PGDATABASE=sequence
       - REDIS_HOST=redis
       - REDIS_PORT=6379  # Internal container port
+      - CHOKIDAR_USEPOLLING=true
     ports:
       - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/workflows", "||", "exit", "1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+    command: npm run start:dev
 
-  # Worker Services - Scale these for high load
-  worker:
-    build: .
-    command: ["node", "dist/worker.js"]
+  # Development Worker with hot reload
+  worker-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PGHOST=postgres
       - PGPORT=5432  # Internal container port, not external mapped port
       - PGUSER=postgres
@@ -72,24 +73,19 @@ services:
       - PGDATABASE=sequence
       - REDIS_HOST=redis
       - REDIS_PORT=6379  # Internal container port
-      - WORKER_CONCURRENCY=5
+      - WORKER_CONCURRENCY=3
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      replicas: 2  # Start with 2 workers, scale as needed
-    healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    command: npx ts-node-dev --respawn --transpile-only src/worker.ts
 
-  # Optional: Redis Commander for Redis GUI
+  # Always include monitoring tools in development
   redis-commander:
     image: rediscommander/redis-commander:latest
     environment:
@@ -98,10 +94,7 @@ services:
       - "8081:8081"
     depends_on:
       - redis
-    profiles:
-      - tools  # Only start with --profile tools
 
-  # Optional: BullMQ Board for queue monitoring
   bullmq-board:
     image: deadly0/bull-board
     environment:
@@ -112,8 +105,6 @@ services:
       - "3001:3000"
     depends_on:
       - redis
-    profiles:
-      - tools  # Only start with --profile tools
 
 volumes:
   postgres_data:

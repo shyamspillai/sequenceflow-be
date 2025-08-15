@@ -33,4 +33,8 @@ export class WorkflowRun {
 
 	@OneToMany(() => WorkflowRunLog, (log: WorkflowRunLog) => log.run, { cascade: ['insert', 'update'], eager: false })
 	logs!: WorkflowRunLog[]
+
+	// Add tasks relationship for async execution
+	@OneToMany('WorkflowTask', 'run', { cascade: ['insert', 'update'], eager: false })
+	tasks!: any[]
 } 

@@ -123,7 +123,10 @@ async function executeApiCall(base: any, payload: Record<string, unknown>): Prom
 }
 
 const executors: Record<string, NodeExecutor> = {
-	inputText: async (base, payload) => ({ logs: [{ kind: 'input', nodeId: base.id, name: base.name, content: `Input: ${JSON.stringify(payload)}` }] }),
+	inputText: async (base, payload) => ({ 
+		logs: [{ kind: 'input', nodeId: base.id, name: base.name, content: `Input: ${JSON.stringify(payload)}` }],
+		payload: payload // Pass the input payload to downstream nodes
+	}),
 	decision: async (base, payload) => {
 		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
 		const decisions: any[] = parseJsonIfString<any[]>(cfg?.decisions, [] as any[])
@@ -143,14 +146,22 @@ const executors: Record<string, NodeExecutor> = {
 		const matchedIds = Array.from(matches)
 		const logs: ExecutionResult['logs'] = [{ kind: 'decision', nodeId: base.id, name: base.name, content: `Matched ${matchedIds.length} outcome(s): ${matchedIds.join(', ') || 'none'}` }]
 		const allowedSourceHandles = new Set<string>([...matchedIds.map(id => `out-${id}`)])
-		return { logs, allowedSourceHandles }
+		return { logs, allowedSourceHandles, payload } // Pass payload through
 	},
 	notification: async (base, payload) => {
 		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
 		const content = interpolateTemplate((cfg ?? {}).template ?? '', payload as any)
-		return { logs: [{ kind: 'notification', nodeId: base.id, name: base.name, content }] }
+		return { 
+			logs: [{ kind: 'notification', nodeId: base.id, name: base.name, content }],
+			payload // Pass payload through to downstream nodes
+		}
 	},
 	apiCall: executeApiCall,
+}
+
+// Export executors for use in async task execution
+export function getExecutors(): Record<string, NodeExecutor> {
+	return executors
 }
 
 export async function executeWorkflow(wf: PersistedWorkflowDto, initialInput?: Record<string, unknown>): Promise<ExecutionResult> {

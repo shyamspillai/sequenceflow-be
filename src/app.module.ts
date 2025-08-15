@@ -6,6 +6,7 @@ import { WorkflowNode } from './workflow/entities/node.entity'
 import { WorkflowEdge } from './workflow/entities/edge.entity'
 import { WorkflowRun } from './workflow/entities/run.entity'
 import { WorkflowRunLog } from './workflow/entities/runLog.entity'
+import { WorkflowTask } from './workflow/entities/task.entity'
 
 @Module({
 	imports: [
@@ -16,7 +17,7 @@ import { WorkflowRunLog } from './workflow/entities/runLog.entity'
 			username: process.env.PGUSER || 'postgres',
 			password: process.env.PGPASSWORD || 'postgres',
 			database: process.env.PGDATABASE || 'sequence',
-			entities: [Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, WorkflowRunLog],
+			entities: [Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, WorkflowRunLog, WorkflowTask],
 			synchronize: true,
 		}),
 		WorkflowModule,
