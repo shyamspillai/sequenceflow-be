@@ -202,14 +202,29 @@ export class AsyncWorkflowService {
 	}
 
 	private async queueStartTask(runId: string): Promise<void> {
-		// Find the inputText task (start node)
-		const startTask = await this.taskRepo.findOne({
+		// Find the start task - either inputText or a task with no dependencies
+		let startTask = await this.taskRepo.findOne({
 			where: { 
 				run: { id: runId },
 				nodeType: 'inputText'
 			},
 			relations: ['run', 'run.workflow']
 		})
+
+		// If no inputText node found, find the task with no dependencies (root node)
+		if (!startTask) {
+			const allTasks = await this.taskRepo.find({
+				where: { run: { id: runId } },
+				relations: ['run', 'run.workflow']
+			})
+
+			// Find task with empty dependencies array or null
+			startTask = allTasks.find(task => 
+				!task.dependencies || 
+				task.dependencies.length === 0 || 
+				(Array.isArray(task.dependencies) && task.dependencies.every(dep => !dep))
+			)
+		}
 
 		if (!startTask) {
 			throw new Error(`Start task not found for run ${runId}`)

@@ -37,6 +37,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 			await this.createConditionalApiFlow()
 			await this.createLinkedInLeadQualificationFlow()
 			await this.createSmartBuildingCoolingFlow()
+			await this.createAdvancedCoolingWorkflow()
 
 			this.logger.log('✅ Sample workflows seeded successfully!')
 		} catch (error) {
@@ -405,16 +406,6 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 							defaultValue: '',
 							validationLogic: null,
 							validationConfig: null
-						},
-						{ 
-							id: randomUUID(), 
-							key: 'threshold', 
-							label: 'Hot Temperature Alert (°C)', 
-							inputKind: 'number',
-							placeholder: '25',
-							defaultValue: 25,
-							validationLogic: null,
-							validationConfig: null
 						}
 					]
 				},
@@ -422,8 +413,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				outputSchema: {
 					type: 'object',
 					properties: {
-						city: { type: 'string' },
-						threshold: { type: 'number' }
+						city: { type: 'string' }
 					}
 				},
 				connections: ['weather-check']
@@ -506,7 +496,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 400,
 				y: 250,
 				config: {
-					template: '🔥 HOT WEATHER ALERT for {{data.city}}!\n\n🌡️ Current: {{data.temperature}}°C\n⚠️ This is above your threshold of {{threshold}}°C\n💧 Humidity: {{data.humidity}}%\n☁️ Condition: {{data.condition}}\n\nStay cool and hydrated!'
+					template: '🔥 HOT WEATHER ALERT for {{city}}!\n\n🌡️ Current: {{data.temperature}}°C\n⚠️ This is above the threshold of 25°C\n💧 Humidity: {{data.humidity}}%\n☁️ Condition: {{data.condition}}\n\nStay cool and hydrated!'
 				},
 				inputSchema: {},
 				outputSchema: {},
@@ -520,7 +510,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 600,
 				y: 250,
 				config: {
-					template: '✅ Normal weather in {{data.city}}\n\n🌡️ Temperature: {{data.temperature}}°C (threshold: {{threshold}}°C)\n☁️ Condition: {{data.condition}}\n💧 Humidity: {{data.humidity}}%\n\nEnjoy your day!'
+					template: '✅ Normal weather in {{city}}\n\n🌡️ Temperature: {{data.temperature}}°C (threshold: 25°C)\n☁️ Condition: {{data.condition}}\n💧 Humidity: {{data.humidity}}%\n\nEnjoy your day!'
 				},
 				inputSchema: {},
 				outputSchema: {},
@@ -773,13 +763,6 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 							label: 'Zone',
 							inputKind: 'text',
 							defaultValue: 'server_room'
-						},
-						{
-							id: randomUUID(),
-							key: 'temperature_threshold',
-							label: 'Temperature Threshold (°C)',
-							inputKind: 'number',
-							defaultValue: '30'
 						}
 					]
 				},
@@ -787,8 +770,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				outputSchema: {
 					type: 'object',
 					properties: {
-						zone: { type: 'string' },
-						temperature_threshold: { type: 'number' }
+						zone: { type: 'string' }
 					}
 				},
 				connections: ['temperature-sensor']
@@ -871,7 +853,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 350,
 				y: 250,
 				config: {
-					template: '🚨 TEMPERATURE ALERT!\n\n🌡️ Current: {{data.temperature}}°C\n🎯 Threshold: {{temperature_threshold}}°C\n🏢 Zone: {{data.zone}}\n💧 Humidity: {{data.humidity}}%\n🌬️ Air Quality: {{data.air_quality}}\n\n⚠️ Action Required: Activate cooling system immediately!'
+					template: '🚨 TEMPERATURE ALERT!\n\n🌡️ Current: {{data.temperature}}°C\n🎯 Threshold: 30°C\n🏢 Zone: {{zone}}\n💧 Humidity: {{data.humidity}}%\n🌬️ Air Quality: {{data.air_quality}}\n\n⚠️ Action Required: Activate cooling system immediately!'
 				},
 				inputSchema: {},
 				outputSchema: {},
@@ -885,7 +867,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 650,
 				y: 250,
 				config: {
-					template: '✅ Building Temperature Normal\n\n🌡️ Current: {{data.temperature}}°C\n🎯 Threshold: {{temperature_threshold}}°C\n🏢 Zone: {{data.zone}}\n💧 Humidity: {{data.humidity}}%\n🌬️ Air Quality: {{data.air_quality}}\n\nNo action required - all systems operating normally.'
+					template: '✅ Building Temperature Normal\n\n🌡️ Current: {{data.temperature}}°C\n🎯 Threshold: 30°C\n🏢 Zone: {{zone}}\n💧 Humidity: {{data.humidity}}%\n🌬️ Air Quality: {{data.air_quality}}\n\nNo action required - all systems operating normally.'
 				},
 				inputSchema: {},
 				outputSchema: {},
@@ -906,6 +888,222 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 			{ sourceId: 'temperature-sensor', targetId: 'temperature-check', sourceHandle: 'out', targetHandle: 'in' },
 			{ sourceId: 'temperature-check', targetId: 'hot-alert', sourceHandle: 'out-true', targetHandle: 'in' },
 			{ sourceId: 'temperature-check', targetId: 'normal-notification', sourceHandle: 'out-false', targetHandle: 'in' }
+		]
+
+		workflow.edges = edgeData.map((edgeData, index) => {
+			const edge = new WorkflowEdge()
+			edge.sourceId = edgeData.sourceId
+			edge.targetId = edgeData.targetId
+			edge.sourceHandleId = edgeData.sourceHandle
+			edge.targetHandleId = edgeData.targetHandle
+			return edge
+		})
+
+		await this.workflowRepo.save(workflow)
+		this.logger.log(`✅ Created workflow: "${workflow.name}"`)
+	}
+
+	private async createAdvancedCoolingWorkflow() {
+		const workflow = new Workflow()
+		workflow.name = '🏢 Advanced Building Cooling System'
+
+		// Define nodes (6 nodes total):
+		// 1. Temperature Sensor (API Call - auto-triggered)
+		// 2. AC Control (API Call) 
+		// 3. Wait Node (5 minutes = 10 seconds for testing)
+		// 4. Temperature Re-check (API Call - check temp after cooling)
+		// 5. Temperature Decision (IfElse - is temp still high?)
+		// 6. Manager Notification or Success Notification (split paths)
+
+		const nodes: Partial<WorkflowNode>[] = [
+			{
+				persistedId: 'temp-sensor',
+				baseId: 'temp-sensor', 
+				name: 'Temperature Sensor',
+				type: 'apiCall',
+				x: 100,
+				y: 100,
+				config: {
+					method: 'GET',
+					url: 'http://api-dev:3000/workflows/api/mock/sensors/temperature/live',
+					queryParams: [
+						{ key: 'zone', value: 'main_building' }
+					],
+					headers: [],
+					body: {}
+				},
+				inputSchema: {},
+				outputSchema: {
+					type: 'object',
+					properties: {
+						id: { type: 'string' },
+						zone: { type: 'string' },
+						temperature: { type: 'number' },
+						alert_level: { type: 'string' },
+						humidity: { type: 'number' },
+						timestamp: { type: 'string' },
+						requires_action: { type: 'boolean' },
+						sensor_id: { type: 'string' }
+					}
+				},
+				connections: ['ac-control']
+			},
+			{
+				persistedId: 'ac-control',
+				baseId: 'ac-control',
+				name: 'Turn On AC Unit',
+				type: 'apiCall',
+				x: 350,
+				y: 100,
+				config: {
+					method: 'POST',
+					url: 'http://api-dev:3000/workflows/api/mock/building/ac/control',
+					queryParams: [],
+					headers: [{ key: 'Content-Type', value: 'application/json' }],
+					body: {
+						zone: '{{data.zone}}',
+						action: 'turn_on',
+						target_temperature: 22
+					}
+				},
+				inputSchema: {},
+				outputSchema: {
+					type: 'object',
+					properties: {
+						control_id: { type: 'string' },
+						zone: { type: 'string' },
+						success: { type: 'boolean' },
+						action: { type: 'string' },
+						target_temperature: { type: 'number' },
+						estimated_cooling_time: { type: 'number' },
+						status_message: { type: 'string' }
+					}
+				},
+				connections: ['wait-cooling']
+			},
+			{
+				persistedId: 'wait-cooling',
+				baseId: 'wait-cooling',
+				name: 'Wait for Cooling',
+				type: 'delay',
+				x: 600,
+				y: 100,
+				config: {
+					delayValue: 10, // 10 seconds (represents 5 minutes)
+					delayType: 'seconds'
+				},
+				inputSchema: {},
+				outputSchema: {},
+				connections: ['temp-recheck-api']
+			},
+			{
+				persistedId: 'temp-recheck-api',
+				baseId: 'temp-recheck-api',
+				name: 'Re-check Temperature',
+				type: 'apiCall',
+				x: 850,
+				y: 100,
+				config: {
+					method: 'GET',
+					url: 'http://api-dev:3000/workflows/api/mock/sensors/temperature/live',
+					queryParams: [
+						{ key: 'zone', value: 'main_building' }
+					],
+					headers: [],
+					body: {}
+				},
+				inputSchema: {},
+				outputSchema: {
+					type: 'object',
+					properties: {
+						id: { type: 'string' },
+						zone: { type: 'string' },
+						temperature: { type: 'number' },
+						alert_level: { type: 'string' },
+						humidity: { type: 'number' },
+						timestamp: { type: 'string' },
+						requires_action: { type: 'boolean' },
+						sensor_id: { type: 'string' }
+					}
+				},
+				connections: ['temp-decision']
+			},
+			{
+				persistedId: 'temp-decision',
+				baseId: 'temp-decision',
+				name: 'Temperature Still High?',
+				type: 'ifElse',
+				x: 1100,
+				y: 100,
+				config: {
+					condition: {
+						name: 'Temperature Still Above 30°C',
+						predicates: [{
+							id: 'pred-1',
+							targetField: 'data.temperature',
+							validationLogic: { '>': [{ var: 'value' }, 30] },
+							validationConfig: {
+								kind: 'number',
+								combiner: 'all',
+								rules: [{
+									type: 'gt',
+									value: 30
+								}]
+							}
+						}],
+						trueText: 'Still Hot',
+						falseText: 'Cooled Down'
+					}
+				},
+				inputSchema: {},
+				outputSchema: {},
+				connections: ['manager-alert', 'cooling-success']
+			},
+			{
+				persistedId: 'manager-alert',
+				baseId: 'manager-alert',
+				name: 'Alert Building Manager',
+				type: 'notification',
+				x: 1000,
+				y: 300,
+				config: {
+					template: '🚨 URGENT: Cooling System Alert!\n\n🌡️ Temperature: {{data.temperature}}°C\n🎯 Zone: {{data.zone}}\n❄️ AC has been running for 5 minutes but temperature remains above 30°C\n\n⚠️ Manager acknowledgment required within 10 minutes\n🆔 Sensor: {{data.sensor_id}}\n⏰ Alert Time: {{data.timestamp}}\n\nPlease respond immediately or backup cooling will activate automatically.'
+				},
+				inputSchema: {},
+				outputSchema: {},
+				connections: []
+			},
+			{
+				persistedId: 'cooling-success',
+				baseId: 'cooling-success',
+				name: 'Cooling Successful',
+				type: 'notification',
+				x: 1300,
+				y: 300,
+				config: {
+					template: '✅ Building Temperature Normalized\n\n🌡️ Current: {{data.temperature}}°C\n🎯 Zone: {{data.zone}}\n❄️ AC system successfully cooled the area\n🆔 Sensor: {{data.sensor_id}}\n⏰ Time: {{data.timestamp}}\n\n🎉 Normal operations resumed!'
+				},
+				inputSchema: {},
+				outputSchema: {},
+				connections: []
+			}
+		]
+
+		// Create workflow nodes
+		workflow.nodes = nodes.map((nodeData, index) => {
+			const node = new WorkflowNode()
+			Object.assign(node, nodeData)
+			return node
+		})
+
+		// Create edges
+		const edgeData = [
+			{ sourceId: 'temp-sensor', targetId: 'ac-control', sourceHandle: 'out', targetHandle: 'in' },
+			{ sourceId: 'ac-control', targetId: 'wait-cooling', sourceHandle: 'out', targetHandle: 'in' },
+			{ sourceId: 'wait-cooling', targetId: 'temp-recheck-api', sourceHandle: 'out', targetHandle: 'in' },
+			{ sourceId: 'temp-recheck-api', targetId: 'temp-decision', sourceHandle: 'out', targetHandle: 'in' },
+			{ sourceId: 'temp-decision', targetId: 'manager-alert', sourceHandle: 'out-true', targetHandle: 'in' },
+			{ sourceId: 'temp-decision', targetId: 'cooling-success', sourceHandle: 'out-false', targetHandle: 'in' }
 		]
 
 		workflow.edges = edgeData.map((edgeData, index) => {

@@ -427,6 +427,78 @@ export class MockApiController {
 		}
 	}
 
+	// Temperature Sensor - Auto-trigger endpoint for workflows  
+	@Get('sensors/temperature/live')
+	async getLiveTemperature(@Query() query: any) {
+		const { zone = 'main_building' } = query
+		
+		// Higher chance of hot temperatures for testing workflows
+		const random = Math.random()
+		let temperature: number
+		
+		if (random < 0.4) {
+			// 40% chance: Hot temperature (30-38°C) to trigger workflows
+			temperature = 30 + Math.random() * 8
+		} else if (random < 0.7) {
+			// 30% chance: Warm temperature (25-30°C) 
+			temperature = 25 + Math.random() * 5
+		} else {
+			// 30% chance: Normal temperature (18-25°C)
+			temperature = 18 + Math.random() * 7
+		}
+		
+		temperature = Math.round(temperature * 10) / 10
+		
+		const alertLevel = temperature > 35 ? 'critical' : 
+		                  temperature > 30 ? 'high' : 
+		                  temperature > 25 ? 'moderate' : 'normal'
+		
+		return {
+			id: `sensor-${Date.now()}`,
+			zone,
+			temperature,
+			alert_level: alertLevel,
+			humidity: Math.floor(Math.random() * 40) + 40,
+			timestamp: new Date().toISOString(),
+			requires_action: temperature > 30,
+			sensor_id: `TEMP_${zone.toUpperCase()}_001`
+		}
+	}
+
+	// Workflow Auto-Trigger Simulation
+	@Post('triggers/temperature-alert')
+	async triggerTemperatureWorkflow(@Body() body: any) {
+		const { zone = 'main_building' } = body
+		
+		// Get current temperature
+		const tempData = await this.getLiveTemperature({ zone })
+		
+		if (tempData.requires_action) {
+			// In a real system, this would trigger the workflow execution
+			// For now, we simulate the trigger response
+			return {
+				trigger_id: `trigger-${Date.now()}`,
+				workflow_name: '🏢 Advanced Building Cooling System',
+				triggered: true,
+				reason: `Temperature ${tempData.temperature}°C exceeds 30°C threshold`,
+				zone: tempData.zone,
+				sensor_data: tempData,
+				next_action: 'Starting automated cooling sequence...',
+				estimated_completion: '15 minutes'
+			}
+		} else {
+			return {
+				trigger_id: `trigger-${Date.now()}`,
+				workflow_name: '🏢 Advanced Building Cooling System',
+				triggered: false,
+				reason: `Temperature ${tempData.temperature}°C is within normal range`,
+				zone: tempData.zone,
+				sensor_data: tempData,
+				next_action: 'No action required'
+			}
+		}
+	}
+
 	// AC Control API
 	@Post('building/ac/control')
 	async controlACUnit(@Body() body: any) {
