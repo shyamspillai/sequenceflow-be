@@ -7,14 +7,14 @@ echo "======================================="
 mkdir -p frontend-dist
 
 echo "📦 Building frontend..."
-if [ ! -d "../sequence-flow" ]; then
+if [ ! -d "../sequenceflow-fe" ]; then
     echo "❌ Frontend directory not found. Please run this from sequence-be directory"
-    echo "   Expected: ../sequence-flow"
+    echo "   Expected: ../sequenceflow-fe"
     exit 1
 fi
 
 # Build frontend with correct API base URL
-cd ../sequence-flow
+cd ../sequenceflow-fe
 
 # Update API base URL to use same origin
 echo "⚙️  Configuring frontend for same-origin deployment..."
