@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  workflow-network:
+    driver: bridge
+
 services:
   # Infrastructure Services (same as production)
   postgres:
@@ -17,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - workflow-network
 
   redis:
     image: redis:7-alpine
@@ -29,6 +35,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - workflow-network
 
   # Development API Server with hot reload
   api-dev:
@@ -58,6 +66,11 @@ services:
       redis:
         condition: service_healthy
     command: npm run start:dev
+    networks:
+      workflow-network:
+        aliases:
+          - localhost
+          - api
 
   # Development Worker with hot reload
   worker-dev:
@@ -75,6 +88,8 @@ services:
       - REDIS_PORT=6379  # Internal container port
       - WORKER_CONCURRENCY=3
       - CHOKIDAR_USEPOLLING=true
+      - API_HOST=api-dev
+      - API_PORT=3000
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
@@ -84,6 +99,8 @@ services:
       redis:
         condition: service_healthy
     command: npx ts-node-dev --respawn --transpile-only src/worker.ts
+    networks:
+      - workflow-network
 
   # Always include monitoring tools in development
   redis-commander:
@@ -94,6 +111,8 @@ services:
       - "8081:8081"
     depends_on:
       - redis
+    networks:
+      - workflow-network
 
   bullmq-board:
     image: deadly0/bull-board
@@ -105,6 +124,8 @@ services:
       - "3001:3000"
     depends_on:
       - redis
+    networks:
+      - workflow-network
 
 volumes:
   postgres_data:

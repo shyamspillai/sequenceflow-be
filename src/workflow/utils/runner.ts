@@ -29,15 +29,24 @@ export type NodeExecutor = (base: any, payload: Record<string, unknown>) => Prom
 async function executeApiCall(base: any, payload: Record<string, unknown>): Promise<NodeExecuteResult> {
 	const config = parseJsonIfString(base.config, {}) as any
 	const method = config.method || 'GET'
-	const urlTemplate = config.url || 'https://api.example.com/endpoint'
+	let urlTemplate = config.url || 'https://api.example.com/endpoint'
 	const headers = parseJsonIfString(config.headers, []) as any[]
 	const bodyTemplate = config.bodyTemplate
 	const timeoutMs = config.timeoutMs || 10000
 	const expectedStatusCodes = config.expectedStatusCodes || [200, 201, 202, 204]
 
+	// Replace localhost with the appropriate API host for Docker containers
+	const apiHost = process.env.API_HOST || 'localhost'
+	const apiPort = process.env.API_PORT || '3000'
+	
+	// Replace localhost:3000 with the configured API host and port
+	urlTemplate = urlTemplate.replace(/localhost:3000/g, `${apiHost}:${apiPort}`)
+
 	try {
 		// Interpolate URL with payload data
 		const url = interpolateTemplate(urlTemplate, payload)
+		
+		console.log(`API Call: Making request to ${url}`)
 		
 		// Build headers object
 		const requestHeaders: Record<string, string> = {}
@@ -71,6 +80,7 @@ async function executeApiCall(base: any, payload: Record<string, unknown>): Prom
 		})
 
 		clearTimeout(timeoutId)
+		console.log(`API Call: Response status ${response.status}`)
 
 		// Read response
 		let responseData: any
@@ -104,6 +114,7 @@ async function executeApiCall(base: any, payload: Record<string, unknown>): Prom
 		}
 
 	} catch (error: any) {
+		console.error(`API Call failed for ${urlTemplate}:`, error)
 		const errorMessage = error.name === 'AbortError' ? 'Request timeout' : error.message || 'Unknown error'
 		
 		const result = {

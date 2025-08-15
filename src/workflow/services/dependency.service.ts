@@ -49,9 +49,13 @@ export class DependencyService {
 
 		// Filter edges based on allowed source handles (for decision nodes)
 		const validEdges = outgoingEdges.filter(edge => {
-			if (!completedTask.allowedSourceHandles || completedTask.allowedSourceHandles.length === 0) {
-				// No handle restrictions, all edges are valid
+			if (!completedTask.allowedSourceHandles) {
+				// No handle restrictions specified, all edges are valid (for non-decision nodes)
 				return true
+			}
+			if (completedTask.allowedSourceHandles.length === 0) {
+				// Empty allowedSourceHandles means no edges should be followed (decision node with 0 matches)
+				return false
 			}
 			// Check if this edge's source handle is allowed
 			return edge.sourceHandleId && completedTask.allowedSourceHandles.includes(edge.sourceHandleId)
