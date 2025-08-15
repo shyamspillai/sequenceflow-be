@@ -479,12 +479,13 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 						predicates: [{
 							id: 'pred-1',
 							targetField: 'data.temperature',
-							validationLogic: { '>': [{ var: 'value' }, { var: 'threshold' }] },
+							validationLogic: { '>': [{ var: 'value' }, 25] },
 							validationConfig: {
+								kind: 'number',
+								combiner: 'all',
 								rules: [{
-									type: 'greaterThan',
-									value: 'threshold',
-									message: 'Temperature must be greater than threshold°C'
+									type: 'gt',
+									value: 25
 								}]
 							}
 						}],
