@@ -160,6 +160,26 @@ const executors: Record<string, NodeExecutor> = {
 		const allowedSourceHandles = new Set<string>([...matchedIds.map(id => `out-${id}`)])
 		return { logs, allowedSourceHandles, payload } // Pass payload through
 	},
+	ifElse: async (base, payload) => {
+		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
+		const condition = cfg?.condition
+		let conditionMet = false
+		
+		if (condition && Array.isArray(condition.predicates) && condition.predicates.length > 0) {
+			const checks = condition.predicates.map((p: any) => {
+				const value = p.targetField ? getByPath(payload, p.targetField) : payload
+				return applyJsonLogic(p.validationLogic, { value }).isValid
+			})
+			const combiner = condition.combiner ?? 'all'
+			conditionMet = combiner === 'all' ? checks.every(Boolean) : checks.some(Boolean)
+		}
+		
+		const outcome = conditionMet ? 'true' : 'false'
+		const outcomeLabel = conditionMet ? (cfg.trueLabel || 'True') : (cfg.falseLabel || 'False')
+		const logs: ExecutionResult['logs'] = [{ kind: 'decision', nodeId: base.id, name: base.name, content: `If-Else condition evaluated to: ${outcomeLabel}` }]
+		const allowedSourceHandles = new Set<string>([`out-${outcome}`])
+		return { logs, allowedSourceHandles, payload } // Pass payload through
+	},
 	delay: async (base, payload) => {
 		const cfg: any = parseJsonIfString<any>(base?.config, {} as any)
 		const delayMs = cfg?.delayMs || 5000 // Default 5 seconds
