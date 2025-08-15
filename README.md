@@ -4,7 +4,16 @@ This backend supports both synchronous and asynchronous workflow execution using
 
 ## 🚀 Quick Start
 
-### Development (with Hot Reload)
+### Prerequisites
+- **Docker Desktop** ([Download here](https://www.docker.com/products/docker-desktop/))
+
+### 1. Clone & Navigate
+```bash
+git clone https://github.com/shyamspillai/sequenceflow-be.git
+cd sequenceflow-be
+```
+
+### 2. Development (with Hot Reload)
 ```bash
 # Start everything (API + Workers + Infrastructure + Monitoring)
 npm run docker:dev
