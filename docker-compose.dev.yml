@@ -55,6 +55,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379  # Internal container port
       - CHOKIDAR_USEPOLLING=true
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
     ports:
       - "3000:3000"
     volumes:

@@ -93,7 +93,7 @@ export class ApiTemplateService implements OnApplicationBootstrap {
 				provider: 'apollo',
 				category: 'enrichment',
 				method: 'POST',
-				url: 'http://api-dev:3000/workflows/api/mock/apollo/person-enrichment',
+				url: `http://${process.env.API_HOST || 'localhost'}:${process.env.API_PORT || '3000'}/workflows/api/mock/apollo/person-enrichment`,
 				headers: [
 					{ id: '1', key: 'Content-Type', value: 'application/json', enabled: true },
 					{ id: '2', key: 'X-Apollo-API-Key', value: '{{apolloApiKey}}', enabled: true, description: 'Apollo API Key' }

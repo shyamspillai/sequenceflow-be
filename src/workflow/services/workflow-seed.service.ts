@@ -6,6 +6,13 @@ import { Workflow } from '../entities/workflow.entity'
 import { WorkflowNode } from '../entities/node.entity'
 import { WorkflowEdge } from '../entities/edge.entity'
 
+// Helper function to get the API base URL for seed data
+function getApiBaseUrl(): string {
+	const host = process.env.API_HOST || 'localhost'
+	const port = process.env.API_PORT || '3000'
+	return `http://${host}:${port}`
+}
+
 @Injectable()
 export class WorkflowSeedService implements OnApplicationBootstrap {
 	private readonly logger = new Logger(WorkflowSeedService.name)
@@ -101,7 +108,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'GET',
-					url: 'http://localhost:3000/workflows/api/test-weather?city={{city}}',
+					url: `${getApiBaseUrl()}/workflows/api/test-weather?city={{city}}`,
 					headers: [],
 					expectedStatusCodes: [200],
 					timeoutMs: 5000
@@ -220,7 +227,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'POST',
-					url: 'http://localhost:3000/workflows/api/mock/apollo/person-enrichment',
+					url: `${getApiBaseUrl()}/workflows/api/mock/apollo/person-enrichment`,
 					headers: [
 						{ key: 'Content-Type', value: 'application/json', enabled: true }
 					],
@@ -427,7 +434,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'GET',
-					url: 'http://localhost:3000/workflows/api/test-weather?city={{city}}',
+					url: `${getApiBaseUrl()}/workflows/api/test-weather?city={{city}}`,
 					headers: [],
 					expectedStatusCodes: [200],
 					timeoutMs: 5000
@@ -618,7 +625,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 300,
 				y: 100,
 				config: {
-					url: 'http://localhost:3000/workflows/api/mock/lead-scoring/analyze',
+					url: `${getApiBaseUrl()}/workflows/api/mock/lead-scoring/analyze`,
 					method: 'POST',
 					bodyTemplate: '{"lead_source": "{{lead_source}}", "company": "{{company}}", "title": "{{title}}", "email": "{{email}}"}',
 					headers: [
@@ -783,7 +790,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				x: 300,
 				y: 100,
 				config: {
-					url: 'http://localhost:3000/workflows/api/mock/building/temperature?zone={{zone}}&floor=3',
+					url: `${getApiBaseUrl()}/workflows/api/mock/building/temperature?zone={{zone}}&floor=3`,
 					method: 'GET',
 					headers: []
 				},
@@ -925,7 +932,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'GET',
-					url: 'http://api-dev:3000/workflows/api/mock/sensors/temperature/live',
+					url: `${getApiBaseUrl()}/workflows/api/mock/sensors/temperature/live`,
 					queryParams: [
 						{ key: 'zone', value: 'main_building' }
 					],
@@ -957,7 +964,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'POST',
-					url: 'http://api-dev:3000/workflows/api/mock/building/ac/control',
+					url: `${getApiBaseUrl()}/workflows/api/mock/building/ac/control`,
 					queryParams: [],
 					headers: [{ key: 'Content-Type', value: 'application/json' }],
 					body: {
@@ -1005,7 +1012,7 @@ export class WorkflowSeedService implements OnApplicationBootstrap {
 				y: 100,
 				config: {
 					method: 'GET',
-					url: 'http://api-dev:3000/workflows/api/mock/sensors/temperature/live',
+					url: `${getApiBaseUrl()}/workflows/api/mock/sensors/temperature/live`,
 					queryParams: [
 						{ key: 'zone', value: 'main_building' }
 					],
