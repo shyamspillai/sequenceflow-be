@@ -185,8 +185,38 @@ export class DependencyService {
 			}
 		})
 
+		// If there are still running or queued tasks, don't mark anything as skipped yet
+		if (runningTasks > 0 || queuedTasks > 0) {
+			this.logger.debug(`Workflow ${runId} still has active tasks: ${runningTasks} running, ${queuedTasks} queued`)
+			return
+		}
+
+		// Only when no tasks are running or queued, check for unreachable pending tasks
+		if (pendingTasks > 0) {
+			await this.markUnreachableTasksAsSkipped(runId)
+			// Recount pending tasks after marking some as skipped
+			const remainingPendingTasks = await this.taskRepo.count({
+				where: { 
+					run: { id: runId },
+					status: 'pending' as any
+				}
+			})
+			if (remainingPendingTasks > 0) {
+				this.logger.debug(`Workflow ${runId} still has ${remainingPendingTasks} pending tasks that might become reachable`)
+				return
+			}
+		}
+
+		// Final check - recount all task types to ensure accuracy
+		const finalPendingTasks = await this.taskRepo.count({
+			where: { 
+				run: { id: runId },
+				status: 'pending' as any
+			}
+		})
+
 		// If no more tasks to process, mark run as complete
-		if (pendingTasks === 0 && queuedTasks === 0 && runningTasks === 0) {
+		if (finalPendingTasks === 0 && queuedTasks === 0 && runningTasks === 0) {
 			const run = await this.runRepo.findOne({ where: { id: runId } })
 			if (run && run.status === 'running') {
 				// Check if any tasks failed
@@ -208,15 +238,113 @@ export class DependencyService {
 					}
 				})
 
+				const skippedTasks = await this.taskRepo.count({
+					where: { 
+						run: { id: runId },
+						status: 'skipped' as any
+					}
+				})
+
 				run.result = {
 					completedTasks,
 					failedTasks,
-					totalTasks: completedTasks + failedTasks,
+					skippedTasks,
+					totalTasks: completedTasks + failedTasks + skippedTasks,
 				}
 
 				await this.runRepo.save(run)
-				this.logger.log(`Workflow run ${runId} completed with status: ${run.status}`)
+				this.logger.log(`Workflow run ${runId} completed with status: ${run.status} (${completedTasks} completed, ${failedTasks} failed, ${skippedTasks} skipped)`)
 			}
+		}
+	}
+
+	/**
+	 * Mark tasks as skipped if they are unreachable due to decision node branching
+	 */
+	private async markUnreachableTasksAsSkipped(runId: string): Promise<void> {
+		this.logger.debug(`Starting reachability analysis for run ${runId}`)
+		const run = await this.runRepo.findOne({ 
+			where: { id: runId },
+			relations: ['workflow']
+		})
+		if (!run) return
+
+		// Get all edges for this workflow
+		const edges = await this.edgeRepo.find({
+			where: { workflow: { id: run.workflow.id } }
+		})
+
+		// Get all tasks for this run
+		const tasks = await this.taskRepo.find({
+			where: { run: { id: runId } }
+		})
+
+		// Build a map of tasks and their allowed source handles (for decision/ifElse nodes)
+		const tasksWithHandles = tasks.filter(t => 
+			(t.status === 'completed' || t.status === 'running' || t.status === 'queued') &&
+			t.allowedSourceHandles && t.allowedSourceHandles.length > 0
+		)
+		const allowedHandles = new Map<string, Set<string>>()
+		
+		for (const task of tasksWithHandles) {
+			allowedHandles.set(task.nodeId, new Set(task.allowedSourceHandles))
+			this.logger.debug(`Task ${task.nodeId} (${task.nodeType}) has allowed handles: [${task.allowedSourceHandles?.join(', ')}]`)
+		}
+
+		// Find reachable nodes by traversing from active execution paths
+		const reachableNodes = new Set<string>()
+		
+		// Add all completed/running/queued nodes as reachable
+		for (const task of tasks) {
+			if (task.status === 'completed' || task.status === 'running' || task.status === 'queued') {
+				reachableNodes.add(task.nodeId)
+			}
+		}
+
+		// Traverse from all active nodes to find reachable downstream nodes
+		let changed = true
+		while (changed) {
+			changed = false
+			
+			// Check all currently reachable nodes to see what they can reach
+			const currentlyReachable = Array.from(reachableNodes)
+			for (const nodeId of currentlyReachable) {
+				const nodeAllowedHandles = allowedHandles.get(nodeId)
+				
+				// Find outgoing edges from this node
+				const outgoingEdges = edges.filter(e => e.sourceId === nodeId)
+				
+				for (const edge of outgoingEdges) {
+					// Check if this edge is allowed based on decision/ifElse node output
+					const isEdgeAllowed = !nodeAllowedHandles || 
+						!edge.sourceHandleId || 
+						nodeAllowedHandles.has(edge.sourceHandleId)
+					
+					this.logger.debug(`Edge ${edge.sourceId} -> ${edge.targetId} (handle: ${edge.sourceHandleId}): ${isEdgeAllowed ? 'ALLOWED' : 'BLOCKED'}`)
+					
+					if (isEdgeAllowed && !reachableNodes.has(edge.targetId)) {
+						reachableNodes.add(edge.targetId)
+						changed = true
+						this.logger.debug(`Added ${edge.targetId} to reachable nodes`)
+					}
+				}
+			}
+		}
+
+		// Mark unreachable pending tasks as skipped
+		const pendingTasks = tasks.filter(t => t.status === 'pending')
+		const tasksToSkip = pendingTasks.filter(t => !reachableNodes.has(t.nodeId))
+		
+		if (tasksToSkip.length > 0) {
+			for (const task of tasksToSkip) {
+				task.status = 'skipped'
+				task.completedAt = new Date()
+			}
+			await this.taskRepo.save(tasksToSkip)
+			const skippedNodeIds = tasksToSkip.map(t => t.nodeId).join(', ')
+			this.logger.log(`Marked ${tasksToSkip.length} unreachable tasks as skipped in run ${runId}: nodes [${skippedNodeIds}]`)
+		} else {
+			this.logger.debug(`No tasks to skip in run ${runId}. Reachable nodes: [${Array.from(reachableNodes).join(', ')}]`)
 		}
 	}
 
