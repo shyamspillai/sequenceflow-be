@@ -19,6 +19,12 @@ cd sequenceflow-be
 npm run docker:dev
 ```
 
+OR 
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
 ## 🏗️ Architecture Overview
 
 ### 🔄 Async Workflow System
@@ -188,27 +194,6 @@ All services include health checks:
 - Database connectivity
 - Redis connectivity
 
-## 🔍 Benefits of Docker Architecture
-
-### Scalability
-- **Horizontal Workers**: `docker-compose up --scale worker=10`
-- **Zero Downtime**: Rolling updates and scaling
-- **Resource Isolation**: Each service in its own container
-
-### Reliability
-- **Service Isolation**: Failed worker doesn't affect API
-- **Auto Restart**: `restart: unless-stopped` policy
-- **Health Monitoring**: Built-in health checks
-
-### Performance
-- **Optimized Images**: Multi-stage builds for production
-- **Resource Limits**: Configurable CPU/memory limits
-- **Efficient Networking**: Internal Docker networking
-
-### Development Experience
-- **Hot Reload**: Development changes restart services automatically
-- **Consistent Environment**: Same stack across team members
-- **Easy Setup**: Single command to start everything
 
 ## 🛠️ Troubleshooting
 
