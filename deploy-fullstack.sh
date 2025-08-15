@@ -72,6 +72,7 @@ if [ $? -eq 0 ]; then
     echo "✅ Frontend built successfully"
     
     # Copy built files to backend
+    mkdir -p ../sequence-be/frontend-dist
     cp -r dist/* ../sequence-be/frontend-dist/
     echo "📁 Frontend files copied to backend"
 else
@@ -83,12 +84,12 @@ cd ../sequence-be
 
 # Stop existing containers
 echo "🛑 Stopping existing containers..."
-docker-compose -f docker-compose.dev.yml down 2>/dev/null
-docker-compose -f docker-compose.https.yml down 2>/dev/null
+docker compose -f docker-compose.dev.yml down 2>/dev/null
+docker compose -f docker-compose.https.yml down 2>/dev/null
 
 # Start full-stack deployment
 echo "🚀 Starting full-stack deployment..."
-docker-compose -f docker-compose.fullstack.yml up -d --build
+docker compose -f docker-compose.fullstack.yml up -d --build
 
 # Wait for services
 echo "⏳ Waiting for services to start..."
@@ -115,4 +116,4 @@ echo "📊 API endpoints: http://68.183.246.88/workflows"
 echo "🔧 BullMQ Dashboard: http://68.183.246.88:3001"
 echo ""
 echo "📋 Service status:"
-docker-compose -f docker-compose.fullstack.yml ps
+docker compose -f docker-compose.fullstack.yml ps
